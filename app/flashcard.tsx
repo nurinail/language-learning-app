@@ -1,8 +1,11 @@
-import { useRouter } from "expo-router";
+import * as Haptics from "expo-haptics";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Animated,
+    Dimensions,
+    PanResponder,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -10,124 +13,129 @@ import {
 } from "react-native";
 import { getData, setData } from "../src/storage";
 
+const { width } = Dimensions.get("window");
+const SWIPE_THRESHOLD = 120;
+
 export default function FlashcardScreen() {
 	const router = useRouter();
+	const params = useLocalSearchParams();
+	const count = Number(params.count || 5);
 
-	const [words, setWords] = useState<{ id: number; en: string; az: string }[]>([]);
+	const [words, setWords] = useState<any[]>([]);
 	const [index, setIndex] = useState(0);
-	const [showAnswer, setShowAnswer] = useState(false);
 	const [loading, setLoading] = useState(true);
+	const [showAnswer, setShowAnswer] = useState(false);
 
-	// store words (strings) instead of numeric indexes so items are unique across sessions
 	const [known, setKnown] = useState<string[]>([]);
 	const [unknown, setUnknown] = useState<string[]>([]);
 
-	const flipAnim = useRef(new Animated.Value(0)).current;
+	const position = useRef(new Animated.ValueXY()).current;
 
-
+	// 🔥 FETCH
 	useEffect(() => {
 		const load = async () => {
-			try {
-				const res = await fetch(
-					"https://random-word-api.herokuapp.com/word?number=5"
-				);
-				const data = await res.json();
+			const res = await fetch(
+				`https://random-word-api.herokuapp.com/word?number=${count}`,
+			);
+			const data = await res.json();
 
-				const results = [];
+			const results = data.map((w: string, i: number) => ({
+				id: i,
+				en: w,
+				az: "Tap to reveal",
+			}));
 
-				for (let i = 0; i < data.length; i++) {
-					const word = data[i];
-
-					try {
-						const dictRes = await fetch(
-							`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
-						);
-						const dictData = await dictRes.json();
-
-						const meaning =
-							dictData?.[0]?.meanings?.[0]?.definitions?.[0]?.definition ||
-							"No definition";
-
-						results.push({
-							id: i,
-							en: word,
-							az: meaning,
-						});
-					} catch {
-						results.push({
-							id: i,
-							en: word,
-							az: "No definition",
-						});
-					}
-				}
-
-				setWords(results);
-				setLoading(false);
-			} catch (e) {
-				console.log("API ERROR", e);
-			}
+			setWords(results);
+			setLoading(false);
 		};
 
 		load();
-	}, []);
+	}, [ count ]);
 
-	const currentWord = words[index];
+	const current = words[index];
 
-	const flipCard = () => {
-		Animated.timing(flipAnim, {
-			toValue: showAnswer ? 0 : 1,
-			duration: 300,
-			useNativeDriver: true,
-		}).start();
-
-		setShowAnswer(!showAnswer);
-	};
-
+	// 🔥 SAVE
 	const saveResults = async (newKnown: string[], newUnknown: string[]) => {
-		const existingKnown = (await getData("knownWords")) || [];
-		const existingUnknown = (await getData("unknownWords")) || [];
+	const existingKnown = (await getData("knownWords")) || [];
+	const existingUnknown = (await getData("unknownWords")) || [];
 
-		// normalize incoming and existing values to string arrays
-		const existKnownArr = Array.isArray(existingKnown) ? existingKnown : [];
-		const existUnknownArr = Array.isArray(existingUnknown) ? existingUnknown : [];
+	// normalize
+	const existK = Array.isArray(existingKnown) ? existingKnown : [];
+	const existU = Array.isArray(existingUnknown) ? existingUnknown : [];
 
-		const mergedKnown = Array.from(
-			new Set([...existKnownArr, ...newKnown])
-		);
-		const mergedUnknown = Array.from(
-			new Set([...existUnknownArr, ...newUnknown])
-		);
+	// 🔥 MERGE + UNIQUE
+	const mergedKnown = Array.from(new Set([...existK, ...newKnown]));
+	const mergedUnknown = Array.from(new Set([...existU, ...newUnknown]));
 
-		await setData("knownWords", mergedKnown);
-		await setData("unknownWords", mergedUnknown);
-	};
+	await setData("knownWords", mergedKnown);
+	await setData("unknownWords", mergedUnknown);
+};
 
-	const next = async (newKnown: string[], newUnknown: string[]) => {
-		setShowAnswer(false);
-		flipAnim.setValue(0);
-
+	const goNext = async (k: string[], u: string[]) => {
 		if (index + 1 >= words.length) {
-			await saveResults(newKnown, newUnknown);
-
+			await saveResults(k, u);
 			router.replace("/(tabs)/stats");
 			return;
 		}
-
-		setIndex((prev) => prev + 1);
+		setIndex((p) => p + 1);
+		setShowAnswer(false);
+		position.setValue({ x: 0, y: 0 });
 	};
 
-	const handleKnow = () => {
-		const updated = [...known, currentWord.en];
-		setKnown(updated);
-		next(updated, unknown);
+	const handleSwipe = async (dir: "left" | "right") => {
+		await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+		if (dir === "right") {
+			const updated = [...known, current.en];
+			setKnown(updated);
+			goNext(updated, unknown);
+		} else {
+			const updated = [...unknown, current.en];
+			setUnknown(updated);
+			goNext(known, updated);
+		}
 	};
 
-	const handleDontKnow = () => {
-		const updated = [...unknown, currentWord.en];
-		setUnknown(updated);
-		next(known, updated);
+	// 🔥 BUTTON CLICK HANDLERS
+	const handleKnowClick = () => {
+		Animated.timing(position, {
+			toValue: { x: width, y: 0 },
+			duration: 200,
+			useNativeDriver: true,
+		}).start(() => handleSwipe("right"));
 	};
+
+	const handleDontKnowClick = () => {
+		Animated.timing(position, {
+			toValue: { x: -width, y: 0 },
+			duration: 200,
+			useNativeDriver: true,
+		}).start(() => handleSwipe("left"));
+	};
+
+	// 🔥 SWIPE
+	const panResponder = useRef(
+		PanResponder.create({
+			onMoveShouldSetPanResponder: () => true,
+
+			onPanResponderMove: (_, g) => {
+				position.setValue({ x: g.dx, y: g.dy });
+			},
+
+			onPanResponderRelease: (_, g) => {
+				if (g.dx > SWIPE_THRESHOLD) {
+					handleKnowClick();
+				} else if (g.dx < -SWIPE_THRESHOLD) {
+					handleDontKnowClick();
+				} else {
+					Animated.spring(position, {
+						toValue: { x: 0, y: 0 },
+						useNativeDriver: true,
+					}).start();
+				}
+			},
+		}),
+	).current;
 
 	if (loading) {
 		return (
@@ -139,20 +147,31 @@ export default function FlashcardScreen() {
 
 	return (
 		<View style={styles.container}>
-			<TouchableOpacity onPress={flipCard}>
-				<Animated.View style={styles.card}>
-					<Text style={styles.text}>
-						{showAnswer ? currentWord.az : currentWord.en}
-					</Text>
-				</Animated.View>
-			</TouchableOpacity>
+			<Text style={styles.hint}>← Review | Know →</Text>
 
+			<Animated.View
+				{...panResponder.panHandlers}
+				style={[
+					styles.card,
+					{
+						transform: [{ translateX: position.x }, { translateY: position.y }],
+					},
+				]}
+			>
+				<Text style={styles.word}>{showAnswer ? current.az : current.en}</Text>
+
+				<Text style={styles.tap} onPress={() => setShowAnswer(!showAnswer)}>
+					Tap to reveal
+				</Text>
+			</Animated.View>
+
+			{/* 🔥 BUTTONLAR */}
 			<View style={styles.actions}>
-				<TouchableOpacity style={styles.badBtn} onPress={handleDontKnow}>
+				<TouchableOpacity style={styles.badBtn} onPress={handleDontKnowClick}>
 					<Text style={styles.btnText}>❌</Text>
 				</TouchableOpacity>
 
-				<TouchableOpacity style={styles.goodBtn} onPress={handleKnow}>
+				<TouchableOpacity style={styles.goodBtn} onPress={handleKnowClick}>
 					<Text style={styles.btnText}>✅</Text>
 				</TouchableOpacity>
 			</View>
@@ -167,19 +186,28 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 	},
+	hint: {
+		position: "absolute",
+		top: 100,
+		color: "#64748b",
+	},
 	card: {
 		width: 320,
-		height: 200,
+		height: 220,
 		backgroundColor: "#0f172a",
 		borderRadius: 20,
 		justifyContent: "center",
 		alignItems: "center",
 		padding: 20,
 	},
-	text: {
-		fontSize: 20,
+	word: {
+		fontSize: 22,
 		color: "white",
 		textAlign: "center",
+	},
+	tap: {
+		marginTop: 10,
+		color: "#8b5cf6",
 	},
 	actions: {
 		flexDirection: "row",
