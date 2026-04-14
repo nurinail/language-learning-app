@@ -8,40 +8,69 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { saveData } from "../src/storage";
+import { getData, setData } from "../src/storage";
 
 export default function FlashcardScreen() {
 	const router = useRouter();
 
-	const [words, setWords] = useState<any[]>([]);
+	const [words, setWords] = useState<{ id: number; en: string; az: string }[]>([]);
 	const [index, setIndex] = useState(0);
 	const [showAnswer, setShowAnswer] = useState(false);
 	const [loading, setLoading] = useState(true);
 
-	const [known, setKnown] = useState<number[]>([]);
-	const [unknown, setUnknown] = useState<number[]>([]);
+	// store words (strings) instead of numeric indexes so items are unique across sessions
+	const [known, setKnown] = useState<string[]>([]);
+	const [unknown, setUnknown] = useState<string[]>([]);
 
 	const flipAnim = useRef(new Animated.Value(0)).current;
 
+
 	useEffect(() => {
-		fetchWords();
+		const load = async () => {
+			try {
+				const res = await fetch(
+					"https://random-word-api.herokuapp.com/word?number=5"
+				);
+				const data = await res.json();
+
+				const results = [];
+
+				for (let i = 0; i < data.length; i++) {
+					const word = data[i];
+
+					try {
+						const dictRes = await fetch(
+							`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
+						);
+						const dictData = await dictRes.json();
+
+						const meaning =
+							dictData?.[0]?.meanings?.[0]?.definitions?.[0]?.definition ||
+							"No definition";
+
+						results.push({
+							id: i,
+							en: word,
+							az: meaning,
+						});
+					} catch {
+						results.push({
+							id: i,
+							en: word,
+							az: "No definition",
+						});
+					}
+				}
+
+				setWords(results);
+				setLoading(false);
+			} catch (e) {
+				console.log("API ERROR", e);
+			}
+		};
+
+		load();
 	}, []);
-
-	const fetchWords = async () => {
-		const res = await fetch(
-			"https://random-word-api.herokuapp.com/word?number=10",
-		);
-		const data = await res.json();
-
-		const mapped = data.map((w: string, i: number) => ({
-			id: i,
-			en: w,
-			az: "Tap to reveal",
-		}));
-
-		setWords(mapped);
-		setLoading(false);
-	};
 
 	const currentWord = words[index];
 
@@ -55,22 +84,33 @@ export default function FlashcardScreen() {
 		setShowAnswer(!showAnswer);
 	};
 
-	const next = async (newKnown: number[], newUnknown: number[]) => {
+	const saveResults = async (newKnown: string[], newUnknown: string[]) => {
+		const existingKnown = (await getData("knownWords")) || [];
+		const existingUnknown = (await getData("unknownWords")) || [];
+
+		// normalize incoming and existing values to string arrays
+		const existKnownArr = Array.isArray(existingKnown) ? existingKnown : [];
+		const existUnknownArr = Array.isArray(existingUnknown) ? existingUnknown : [];
+
+		const mergedKnown = Array.from(
+			new Set([...existKnownArr, ...newKnown])
+		);
+		const mergedUnknown = Array.from(
+			new Set([...existUnknownArr, ...newUnknown])
+		);
+
+		await setData("knownWords", mergedKnown);
+		await setData("unknownWords", mergedUnknown);
+	};
+
+	const next = async (newKnown: string[], newUnknown: string[]) => {
 		setShowAnswer(false);
 		flipAnim.setValue(0);
 
 		if (index + 1 >= words.length) {
-			// 🔥 SAVE DATA
-			await saveData("knownWords", newKnown);
-			await saveData("unknownWords", newUnknown);
+			await saveResults(newKnown, newUnknown);
 
-			router.replace({
-				pathname: "/result",
-				params: {
-					known: newKnown.length,
-					unknown: newUnknown.length,
-				},
-			});
+			router.replace("/(tabs)/stats");
 			return;
 		}
 
@@ -78,13 +118,13 @@ export default function FlashcardScreen() {
 	};
 
 	const handleKnow = () => {
-		const updated = [...known, currentWord.id];
+		const updated = [...known, currentWord.en];
 		setKnown(updated);
 		next(updated, unknown);
 	};
 
 	const handleDontKnow = () => {
-		const updated = [...unknown, currentWord.id];
+		const updated = [...unknown, currentWord.en];
 		setUnknown(updated);
 		next(known, updated);
 	};
@@ -134,10 +174,12 @@ const styles = StyleSheet.create({
 		borderRadius: 20,
 		justifyContent: "center",
 		alignItems: "center",
+		padding: 20,
 	},
 	text: {
-		fontSize: 32,
+		fontSize: 20,
 		color: "white",
+		textAlign: "center",
 	},
 	actions: {
 		flexDirection: "row",

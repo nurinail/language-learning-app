@@ -26,7 +26,7 @@ export default function ResultScreen() {
 				<Text style={styles.btnText}>Try Again</Text>
 			</TouchableOpacity>
 
-			<TouchableOpacity onPress={() => router.replace("/")}>
+			<TouchableOpacity onPress={() => router.replace("/(tabs)/stats")}>
 				<Text style={styles.link}>Back to Home</Text>
 			</TouchableOpacity>
 		</View>
