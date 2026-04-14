@@ -31,7 +31,6 @@ export default function FlashcardScreen() {
 
 	const position = useRef(new Animated.ValueXY()).current;
 
-	// 🔥 FETCH
 	useEffect(() => {
 		const load = async () => {
 			const res = await fetch(
@@ -42,7 +41,7 @@ export default function FlashcardScreen() {
 			const results = data.map((w: string, i: number) => ({
 				id: i,
 				en: w,
-				az: "Tap to reveal",
+				az: "Açmaq üçün toxun",
 			}));
 
 			setWords(results);
@@ -50,26 +49,23 @@ export default function FlashcardScreen() {
 		};
 
 		load();
-	}, [ count ]);
+	}, [count]);
 
 	const current = words[index];
 
-	// 🔥 SAVE
 	const saveResults = async (newKnown: string[], newUnknown: string[]) => {
-	const existingKnown = (await getData("knownWords")) || [];
-	const existingUnknown = (await getData("unknownWords")) || [];
+		const existingKnown = (await getData("knownWords")) || [];
+		const existingUnknown = (await getData("unknownWords")) || [];
 
-	// normalize
-	const existK = Array.isArray(existingKnown) ? existingKnown : [];
-	const existU = Array.isArray(existingUnknown) ? existingUnknown : [];
+		const existK = Array.isArray(existingKnown) ? existingKnown : [];
+		const existU = Array.isArray(existingUnknown) ? existingUnknown : [];
 
-	// 🔥 MERGE + UNIQUE
-	const mergedKnown = Array.from(new Set([...existK, ...newKnown]));
-	const mergedUnknown = Array.from(new Set([...existU, ...newUnknown]));
+		const mergedKnown = Array.from(new Set([...existK, ...newKnown]));
+		const mergedUnknown = Array.from(new Set([...existU, ...newUnknown]));
 
-	await setData("knownWords", mergedKnown);
-	await setData("unknownWords", mergedUnknown);
-};
+		await setData("knownWords", mergedKnown);
+		await setData("unknownWords", mergedUnknown);
+	};
 
 	const goNext = async (k: string[], u: string[]) => {
 		if (index + 1 >= words.length) {
@@ -96,7 +92,6 @@ export default function FlashcardScreen() {
 		}
 	};
 
-	// 🔥 BUTTON CLICK HANDLERS
 	const handleKnowClick = () => {
 		Animated.timing(position, {
 			toValue: { x: width, y: 0 },
@@ -113,21 +108,16 @@ export default function FlashcardScreen() {
 		}).start(() => handleSwipe("left"));
 	};
 
-	// 🔥 SWIPE
 	const panResponder = useRef(
 		PanResponder.create({
 			onMoveShouldSetPanResponder: () => true,
-
 			onPanResponderMove: (_, g) => {
 				position.setValue({ x: g.dx, y: g.dy });
 			},
-
 			onPanResponderRelease: (_, g) => {
-				if (g.dx > SWIPE_THRESHOLD) {
-					handleKnowClick();
-				} else if (g.dx < -SWIPE_THRESHOLD) {
-					handleDontKnowClick();
-				} else {
+				if (g.dx > SWIPE_THRESHOLD) handleKnowClick();
+				else if (g.dx < -SWIPE_THRESHOLD) handleDontKnowClick();
+				else {
 					Animated.spring(position, {
 						toValue: { x: 0, y: 0 },
 						useNativeDriver: true,
@@ -147,31 +137,44 @@ export default function FlashcardScreen() {
 
 	return (
 		<View style={styles.container}>
-			<Text style={styles.hint}>← Review | Know →</Text>
+			<Text style={styles.hint}>← Təkrar et | Bilirəm →</Text>
 
 			<Animated.View
 				{...panResponder.panHandlers}
 				style={[
 					styles.card,
 					{
-						transform: [{ translateX: position.x }, { translateY: position.y }],
+						transform: [
+							{ translateX: position.x },
+							{ translateY: position.y },
+						],
 					},
 				]}
 			>
-				<Text style={styles.word}>{showAnswer ? current.az : current.en}</Text>
+				<Text style={styles.word}>
+					{showAnswer ? current.az : current.en}
+				</Text>
 
-				<Text style={styles.tap} onPress={() => setShowAnswer(!showAnswer)}>
-					Tap to reveal
+				<Text
+					style={styles.tap}
+					onPress={() => setShowAnswer(!showAnswer)}
+				>
+					Açmaq üçün toxun
 				</Text>
 			</Animated.View>
 
-			{/* 🔥 BUTTONLAR */}
 			<View style={styles.actions}>
-				<TouchableOpacity style={styles.badBtn} onPress={handleDontKnowClick}>
+				<TouchableOpacity
+					style={styles.badBtn}
+					onPress={handleDontKnowClick}
+				>
 					<Text style={styles.btnText}>❌</Text>
 				</TouchableOpacity>
 
-				<TouchableOpacity style={styles.goodBtn} onPress={handleKnowClick}>
+				<TouchableOpacity
+					style={styles.goodBtn}
+					onPress={handleKnowClick}
+				>
 					<Text style={styles.btnText}>✅</Text>
 				</TouchableOpacity>
 			</View>

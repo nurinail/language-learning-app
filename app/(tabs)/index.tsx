@@ -14,22 +14,15 @@ import {
 export default function HomeScreen() {
 	const router = useRouter();
 
-	// 🔥 FLOAT ICON
 	const floatAnim = useRef(new Animated.Value(0)).current;
-
-	// 🔥 ENTRY ANIMATION
 	const translateY = useRef(new Animated.Value(80)).current;
 	const opacity = useRef(new Animated.Value(0)).current;
-
-	// 🔥 STREAK PULSE
 	const pulse = useRef(new Animated.Value(1)).current;
 
 	const [total, setTotal] = useState(0);
-
 	const streak = 3;
 
 	useEffect(() => {
-		// FLOAT
 		Animated.loop(
 			Animated.sequence([
 				Animated.timing(floatAnim, {
@@ -45,7 +38,6 @@ export default function HomeScreen() {
 			]),
 		).start();
 
-		// ENTRY
 		Animated.parallel([
 			Animated.timing(translateY, {
 				toValue: 0,
@@ -59,7 +51,6 @@ export default function HomeScreen() {
 			}),
 		]).start();
 
-		// PULSE
 		Animated.loop(
 			Animated.sequence([
 				Animated.timing(pulse, {
@@ -76,7 +67,6 @@ export default function HomeScreen() {
 		).start();
 	}, [floatAnim, translateY, opacity, pulse]);
 
-	// 🔥 LOAD STATS
 	useEffect(() => {
 		const loadStats = async () => {
 			const known = (await getData("knownWords")) || [];
@@ -86,7 +76,6 @@ export default function HomeScreen() {
 		loadStats();
 	}, []);
 
-	// 🔥 START
 	const start = async (count: number) => {
 		await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
@@ -96,7 +85,6 @@ export default function HomeScreen() {
 		});
 	};
 
-	// 🔥 BUTTON COMPONENT
 	const RenderButton = ({ label, count }: any) => {
 		const scale = useRef(new Animated.Value(1)).current;
 		const [pressed, setPressed] = useState(false);
@@ -138,53 +126,47 @@ export default function HomeScreen() {
 
 	return (
 		<View style={styles.container}>
-			{/* 🔥 BACKGROUND */}
 			<LinearGradient
 				colors={["#1e1b4b", "#020617", "#020617"]}
 				style={StyleSheet.absoluteFill}
 			/>
 
-			{/* 🔥 GLOW */}
 			<LinearGradient
 				colors={["rgba(99,102,241,0.4)", "transparent"]}
 				style={styles.glow}
 			/>
 
-			{/* 🔥 NOISE */}
 			<View style={styles.noise} />
 
 			<Animated.View
 				style={[styles.content, { transform: [{ translateY }], opacity }]}
 			>
-				{/* ICON */}
 				<Animated.Text
 					style={[styles.logo, { transform: [{ translateY: floatAnim }] }]}
 				>
 					📚
 				</Animated.Text>
 
-				<Text style={styles.title}>Learn English</Text>
+				<Text style={styles.title}>İngilis dili öyrən</Text>
 
 				<Text style={styles.subtitle}>
-					How many words do you want to master today?
+					Bu gün neçə söz öyrənmək istəyirsən?
 				</Text>
 
-				{/* 🔥 STATS */}
 				<View style={styles.stats}>
 					<Animated.Text
 						style={[styles.stat, { transform: [{ scale: pulse }] }]}
 					>
-						🔥 {streak} day streak
+						🔥 {streak} günlük ardıcıllıq
 					</Animated.Text>
 
-					<Text style={styles.stat}>📊 {total} words learned</Text>
+					<Text style={styles.stat}>📊 {total} söz öyrənilib</Text>
 				</View>
 
-				{/* 🔥 BUTTONS */}
 				<View style={styles.row}>
-					<RenderButton label="Quick ⚡" count={5} />
-					<RenderButton label="Balanced 🎯" count={10} />
-					<RenderButton label="Intense 🔥" count={20} />
+					<RenderButton label="Sürətli ⚡" count={5} />
+					<RenderButton label="Balanslı 🎯" count={10} />
+					<RenderButton label="İntensiv 🔥" count={20} />
 				</View>
 			</Animated.View>
 		</View>
@@ -192,9 +174,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
+	container: { flex: 1 },
 	glow: {
 		position: "absolute",
 		top: -100,

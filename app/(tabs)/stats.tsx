@@ -34,33 +34,28 @@ export default function StatsScreen() {
 
 	return (
 		<View style={styles.container}>
-			<Text style={styles.title}>Your Progress</Text>
+			<Text style={styles.title}>Sənin inkişafın</Text>
 
-			<View style={styles.card}>
-				<Text style={styles.big}>{total}</Text>
-				<Text style={styles.label}>Total Words</Text>
-			</View>
+<View style={styles.card}>
+	<Text style={styles.big}>{total}</Text>
+	<Text style={styles.label}>Ümumi söz sayı</Text>
+</View>
 
-			<View style={styles.row}>
-				<View style={[styles.smallCard, styles.knownCard]}>
-					<Text style={styles.smallNumber}>{known.length}</Text>
-					<Text style={styles.smallLabel}>Known</Text>
-				</View>
+<View style={styles.row}>
+	<View style={[styles.smallCard, styles.knownCard]}>
+		<Text style={styles.smallNumber}>{known.length}</Text>
+		<Text style={styles.smallLabel}>Bilinən</Text>
+	</View>
 
-				<View style={[styles.smallCard, styles.unknownCard]}>
-					<Text style={styles.smallNumber}>{unknown.length}</Text>
-					<Text style={styles.smallLabel}>Unknown</Text>
-				</View>
-			</View>
+	<View style={[styles.smallCard, styles.unknownCard]}>
+		<Text style={styles.smallNumber}>{unknown.length}</Text>
+		<Text style={styles.smallLabel}>Bilinməyən</Text>
+	</View>
+</View>
 
-			<View style={styles.progressContainer}>
-				<View style={[styles.progressKnown, { flex: knownPercent }]} />
-				<View style={[styles.progressUnknown, { flex: unknownPercent }]} />
-			</View>
-
-			<Text style={styles.percentText}>
-				{knownPercent}% Known • {unknownPercent}% Unknown
-			</Text>
+<Text style={styles.percentText}>
+	{knownPercent}% Bilinir • {unknownPercent}% Təkrar lazımdır
+</Text>
 		</View>
 	);
 }
