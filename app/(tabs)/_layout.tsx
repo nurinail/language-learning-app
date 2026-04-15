@@ -46,7 +46,18 @@ export default function TabLayout() {
           ),
         }}
       />
-
+<Tabs.Screen
+  name="words"
+  options={{
+    tabBarIcon: ({ focused }) => (
+      <Ionicons
+        name="book"
+        size={26}
+        color={focused ? "#8b5cf6" : "#64748b"}
+      />
+    ),
+  }}
+/>
       {/* 🔥 YENİ */}
       <Tabs.Screen
         name="stats"
@@ -61,6 +72,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    
   );
 }
 
