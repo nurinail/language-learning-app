@@ -36,7 +36,7 @@ export default function WordsScreen() {
 
   return (
     <LinearGradient colors={["#020617", "#020617"]} style={styles.container}>
-      <Text style={styles.title}>Sözlərim</Text>
+      <Text  style={styles.title}>Sözlərim</Text>
 
       {/* 🔥 TAB SWITCH */}
       <View style={styles.tabs}>
@@ -107,6 +107,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
     marginBottom: 20,
+    marginTop: 10,
   },
 
   tabs: {

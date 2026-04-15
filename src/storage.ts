@@ -1,59 +1,27 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// In-memory fallback for environments where native storage isn't available (Expo web, missing native module)
-const memoryStore: Record<string, string> = {};
-
-const hasLocalStorage = typeof localStorage !== "undefined" && localStorage !== null;
-
-export const setData = async (key: string, value: unknown) => {
-	const str = JSON.stringify(value);
-	// Try AsyncStorage first
-	try {
-		await AsyncStorage.setItem(key, str);
-		return;
-	} catch (e) {
-		console.warn("AsyncStorage setItem failed, falling back:", e);
-	}
-
-	// Try browser localStorage (for web)
-	try {
-		if (hasLocalStorage) {
-			localStorage.setItem(key, str);
-			return;
-		}
-	} catch (e) {
-		console.warn("localStorage setItem failed, falling back to memory:", e);
-	}
-
-	// Fallback to in-memory store (not persistent across reloads)
-	memoryStore[key] = str;
+// SAVE
+export const setData = async (key: string, value: any) => {
+  try {
+    const json = JSON.stringify(value);
+    await AsyncStorage.setItem(key, json);
+  } catch (e) {
+    console.log("SET ERROR", e);
+  }
 };
 
+// GET
 export const getData = async (key: string) => {
-	// Try AsyncStorage first
-	try {
-		const data = await AsyncStorage.getItem(key);
-		return data ? JSON.parse(data) : null;
-	} catch (e) {
-		console.warn("AsyncStorage getItem failed, falling back:", e);
-	}
+  try {
+    const json = await AsyncStorage.getItem(key);
+    return json != null ? JSON.parse(json) : null;
+  } catch (e) {
+    console.log("GET ERROR", e);
+    return null;
+  }
+};
 
-	// Try browser localStorage (for web)
-	try {
-		if (hasLocalStorage) {
-			const data = localStorage.getItem(key);
-			return data ? JSON.parse(data) : null;
-		}
-	} catch (e) {
-		console.warn("localStorage getItem failed, falling back to memory:", e);
-	}
-
-	// Fallback to in-memory store
-	try {
-		const data = memoryStore[key];
-		return data ? JSON.parse(data) : null;
-	} catch (e) {
-		console.warn("memoryStore parse failed:", e);
-		return null;
-	}
+// REMOVE (optional)
+export const removeData = async (key: string) => {
+  await AsyncStorage.removeItem(key);
 };
