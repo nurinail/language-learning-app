@@ -36,7 +36,7 @@ export default function FlashcardScreen() {
   const params = useLocalSearchParams();
   const count = Number(params.count || 5);
 
-  const [words, setWords] = useState<string[]>([]);
+  const [words, setWords] = useState<any[]>([]);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -48,23 +48,36 @@ export default function FlashcardScreen() {
 
   useEffect(() => {
     loadWords();
-  }, []);
+  }, [count]);
 
-  // 🔥 FAST + SAFE API
+  // 🚀 CACHE + API LOGIC
   const loadWords = async () => {
     try {
       setLoading(true);
+
+      const cacheKey = `words_${count}`;
+
+      // 🔥 CACHE CHECK
+      const cached = await getData(cacheKey);
+
+      if (cached && Array.isArray(cached)) {
+        console.log("⚡ CACHE USED");
+        setWords(cached);
+        setLoading(false);
+        return;
+      }
+
+      console.log("🌐 API CALL");
 
       const res = await fetch(
         `https://random-word-api.herokuapp.com/word?number=${count}`
       );
       const data = await res.json();
 
-      // 🔥 artıq WAIT ETMİRİK hamısına
       const promises = data.map(async (word: string, i: number) => {
         const dictRes = await fetchWithTimeout(
           `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`,
-          1500 // 🔥 MAX 1.5 saniyə gözlə
+          1500
         );
 
         if (!dictRes) {
@@ -86,9 +99,19 @@ export default function FlashcardScreen() {
 
       const results = await Promise.all(promises);
 
+      // 🔥 SAVE CACHE
+      await setData(cacheKey, results);
+
       setWords(results);
     } catch (e) {
-      console.log("ERROR:", e);
+      console.log("❌ API ERROR:", e);
+
+      // 🔥 OFFLINE FALLBACK
+      const cached = await getData(`words_${count}`);
+      if (cached) {
+        console.log("📦 FALLBACK CACHE");
+        setWords(cached);
+      }
     } finally {
       setLoading(false);
     }
