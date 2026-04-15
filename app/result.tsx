@@ -12,23 +12,20 @@ export default function ResultScreen() {
 		<View style={styles.container}>
 			<Text style={styles.emoji}>🎉</Text>
 
-			<Text style={styles.title}>Great Job!</Text>
+			<Text style={styles.title}>Əla nəticə!</Text>
 
-			<View style={styles.box}>
-				<Text style={styles.stat}>✅ {known} words mastered</Text>
-				<Text style={styles.stat}>❌ {unknown} to review</Text>
-			</View>
+<View style={styles.box}>
+	<Text style={styles.stat}>✅ {known} söz öyrənildi</Text>
+	<Text style={styles.stat}>❌ {unknown} söz təkrar edilməlidir</Text>
+</View>
 
-			<TouchableOpacity
-				style={styles.btn}
-				onPress={() => router.replace("/flashcard")}
-			>
-				<Text style={styles.btnText}>Try Again</Text>
-			</TouchableOpacity>
+<TouchableOpacity style={styles.btn}>
+	<Text style={styles.btnText}>Yenidən başla</Text>
+</TouchableOpacity>
 
-			<TouchableOpacity onPress={() => router.replace("/(tabs)/stats")}>
-				<Text style={styles.link}>Back to Home</Text>
-			</TouchableOpacity>
+<TouchableOpacity>
+	<Text style={styles.link}>Ana səhifəyə qayıt</Text>
+</TouchableOpacity>
 		</View>
 	);
 }

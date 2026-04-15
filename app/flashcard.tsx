@@ -1,234 +1,298 @@
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    PanResponder,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  PanResponder,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { getData, setData } from "../src/storage";
 
 const { width } = Dimensions.get("window");
 const SWIPE_THRESHOLD = 120;
 
+// 🔥 timeout helper
+const fetchWithTimeout = async (url: string, ms = 2000) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch {
+    return null;
+  }
+};
+
 export default function FlashcardScreen() {
-	const router = useRouter();
-	const params = useLocalSearchParams();
-	const count = Number(params.count || 5);
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const count = Number(params.count || 5);
 
-	const [words, setWords] = useState<any[]>([]);
-	const [index, setIndex] = useState(0);
-	const [loading, setLoading] = useState(true);
-	const [showAnswer, setShowAnswer] = useState(false);
+  const [words, setWords] = useState<string[]>([]);
+  const [index, setIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [showAnswer, setShowAnswer] = useState(false);
 
-	const [known, setKnown] = useState<string[]>([]);
-	const [unknown, setUnknown] = useState<string[]>([]);
+  const [known, setKnown] = useState<string[]>([]);
+  const [unknown, setUnknown] = useState<string[]>([]);
 
-	const position = useRef(new Animated.ValueXY()).current;
+  const position = useRef(new Animated.ValueXY()).current;
 
-	useEffect(() => {
-		const load = async () => {
-			const res = await fetch(
-				`https://random-word-api.herokuapp.com/word?number=${count}`,
-			);
-			const data = await res.json();
+  useEffect(() => {
+    loadWords();
+  }, []);
 
-			const results = data.map((w: string, i: number) => ({
-				id: i,
-				en: w,
-				az: "Açmaq üçün toxun",
-			}));
+  // 🔥 FAST + SAFE API
+  const loadWords = async () => {
+    try {
+      setLoading(true);
 
-			setWords(results);
-			setLoading(false);
-		};
+      const res = await fetch(
+        `https://random-word-api.herokuapp.com/word?number=${count}`
+      );
+      const data = await res.json();
 
-		load();
-	}, [count]);
+      // 🔥 artıq WAIT ETMİRİK hamısına
+      const promises = data.map(async (word: string, i: number) => {
+        const dictRes = await fetchWithTimeout(
+          `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`,
+          1500 // 🔥 MAX 1.5 saniyə gözlə
+        );
 
-	const current = words[index];
+        if (!dictRes) {
+          return { id: i, en: word, az: "Tərif tapılmadı" };
+        }
 
-	const saveResults = async (newKnown: string[], newUnknown: string[]) => {
-		const existingKnown = (await getData("knownWords")) || [];
-		const existingUnknown = (await getData("unknownWords")) || [];
+        try {
+          const dictData = await dictRes.json();
 
-		const existK = Array.isArray(existingKnown) ? existingKnown : [];
-		const existU = Array.isArray(existingUnknown) ? existingUnknown : [];
+          const meaning =
+            dictData?.[0]?.meanings?.[0]?.definitions?.[0]?.definition ||
+            "Tərif tapılmadı";
 
-		const mergedKnown = Array.from(new Set([...existK, ...newKnown]));
-		const mergedUnknown = Array.from(new Set([...existU, ...newUnknown]));
+          return { id: i, en: word, az: meaning };
+        } catch {
+          return { id: i, en: word, az: "Tərif tapılmadı" };
+        }
+      });
 
-		await setData("knownWords", mergedKnown);
-		await setData("unknownWords", mergedUnknown);
-	};
+      const results = await Promise.all(promises);
 
-	const goNext = async (k: string[], u: string[]) => {
-		if (index + 1 >= words.length) {
-			await saveResults(k, u);
-			router.replace("/(tabs)/stats");
-			return;
-		}
-		setIndex((p) => p + 1);
-		setShowAnswer(false);
-		position.setValue({ x: 0, y: 0 });
-	};
+      setWords(results);
+    } catch (e) {
+      console.log("ERROR:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	const handleSwipe = async (dir: "left" | "right") => {
-		await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const progress = words.length ? (index + 1) / words.length : 0;
+  const current = words[index];
 
-		if (dir === "right") {
-			const updated = [...known, current.en];
-			setKnown(updated);
-			goNext(updated, unknown);
-		} else {
-			const updated = [...unknown, current.en];
-			setUnknown(updated);
-			goNext(known, updated);
-		}
-	};
+  const saveResults = async (k: string[], u: string[]) => {
+    const ek = (await getData("knownWords")) || [];
+    const eu = (await getData("unknownWords")) || [];
 
-	const handleKnowClick = () => {
-		Animated.timing(position, {
-			toValue: { x: width, y: 0 },
-			duration: 200,
-			useNativeDriver: true,
-		}).start(() => handleSwipe("right"));
-	};
+    await setData("knownWords", [...new Set([...ek, ...k])]);
+    await setData("unknownWords", [...new Set([...eu, ...u])]);
+  };
 
-	const handleDontKnowClick = () => {
-		Animated.timing(position, {
-			toValue: { x: -width, y: 0 },
-			duration: 200,
-			useNativeDriver: true,
-		}).start(() => handleSwipe("left"));
-	};
+  const next = async (k: string[], u: string[]) => {
+    if (index + 1 >= words.length) {
+      await saveResults(k, u);
+      router.replace("/(tabs)/stats");
+      return;
+    }
 
-	const panResponder = useRef(
-		PanResponder.create({
-			onMoveShouldSetPanResponder: () => true,
-			onPanResponderMove: (_, g) => {
-				position.setValue({ x: g.dx, y: g.dy });
-			},
-			onPanResponderRelease: (_, g) => {
-				if (g.dx > SWIPE_THRESHOLD) handleKnowClick();
-				else if (g.dx < -SWIPE_THRESHOLD) handleDontKnowClick();
-				else {
-					Animated.spring(position, {
-						toValue: { x: 0, y: 0 },
-						useNativeDriver: true,
-					}).start();
-				}
-			},
-		}),
-	).current;
+    setIndex((p) => p + 1);
+    setShowAnswer(false);
+    position.setValue({ x: 0, y: 0 });
+  };
 
-	if (loading) {
-		return (
-			<View style={styles.container}>
-				<ActivityIndicator color="white" />
-			</View>
-		);
-	}
+  const swipe = async (dir: "left" | "right") => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-	return (
-		<View style={styles.container}>
-			<Text style={styles.hint}>← Təkrar et | Bilirəm →</Text>
+    if (dir === "right") {
+      const updated = [...known, current.en];
+      setKnown(updated);
+      next(updated, unknown);
+    } else {
+      const updated = [...unknown, current.en];
+      setUnknown(updated);
+      next(known, updated);
+    }
+  };
 
-			<Animated.View
-				{...panResponder.panHandlers}
-				style={[
-					styles.card,
-					{
-						transform: [
-							{ translateX: position.x },
-							{ translateY: position.y },
-						],
-					},
-				]}
-			>
-				<Text style={styles.word}>
-					{showAnswer ? current.az : current.en}
-				</Text>
+  const handleKnow = () => {
+    Animated.timing(position, {
+      toValue: { x: width, y: 0 },
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => swipe("right"));
+  };
 
-				<Text
-					style={styles.tap}
-					onPress={() => setShowAnswer(!showAnswer)}
-				>
-					Açmaq üçün toxun
-				</Text>
-			</Animated.View>
+  const handleDontKnow = () => {
+    Animated.timing(position, {
+      toValue: { x: -width, y: 0 },
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => swipe("left"));
+  };
 
-			<View style={styles.actions}>
-				<TouchableOpacity
-					style={styles.badBtn}
-					onPress={handleDontKnowClick}
-				>
-					<Text style={styles.btnText}>❌</Text>
-				</TouchableOpacity>
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, g) => {
+        position.setValue({ x: g.dx, y: g.dy });
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx > SWIPE_THRESHOLD) handleKnow();
+        else if (g.dx < -SWIPE_THRESHOLD) handleDontKnow();
+        else {
+          Animated.spring(position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
-				<TouchableOpacity
-					style={styles.goodBtn}
-					onPress={handleKnowClick}
-				>
-					<Text style={styles.btnText}>✅</Text>
-				</TouchableOpacity>
-			</View>
-		</View>
-	);
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator color="white" size="large" />
+        <Text style={{ color: "#94a3b8", marginTop: 10 }}>
+          Yüklənir...
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <LinearGradient colors={["#020617", "#020617"]} style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Learning Session</Text>
+
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { flex: progress }]} />
+          <View style={{ flex: 1 - progress }} />
+        </View>
+
+        <Text style={styles.counter}>
+          {index + 1} / {words.length}
+        </Text>
+      </View>
+
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.card,
+          {
+            transform: [
+              { translateX: position.x },
+              { translateY: position.y },
+            ],
+          },
+        ]}
+      >
+        <Text style={styles.word}>
+          {showAnswer ? current.az : current.en}
+        </Text>
+
+        <Text style={styles.tap} onPress={() => setShowAnswer(!showAnswer)}>
+          toxun
+        </Text>
+      </Animated.View>
+
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.bad} onPress={handleDontKnow}>
+          <Text style={styles.btn}>❌</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.good} onPress={handleKnow}>
+          <Text style={styles.btn}>✅</Text>
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#020617",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	hint: {
-		position: "absolute",
-		top: 100,
-		color: "#64748b",
-	},
-	card: {
-		width: 320,
-		height: 220,
-		backgroundColor: "#0f172a",
-		borderRadius: 20,
-		justifyContent: "center",
-		alignItems: "center",
-		padding: 20,
-	},
-	word: {
-		fontSize: 22,
-		color: "white",
-		textAlign: "center",
-	},
-	tap: {
-		marginTop: 10,
-		color: "#8b5cf6",
-	},
-	actions: {
-		flexDirection: "row",
-		marginTop: 40,
-		gap: 20,
-	},
-	goodBtn: {
-		backgroundColor: "#22c55e",
-		padding: 16,
-		borderRadius: 12,
-	},
-	badBtn: {
-		backgroundColor: "#ef4444",
-		padding: 16,
-		borderRadius: 12,
-	},
-	btnText: {
-		color: "white",
-		fontSize: 18,
-	},
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  header: {
+    position: "absolute",
+    top: 80,
+    width: "90%",
+  },
+  title: {
+    color: "white",
+    fontSize: 18,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  progressBar: {
+    flexDirection: "row",
+    height: 8,
+    backgroundColor: "#1e293b",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  progressFill: {
+    backgroundColor: "#8b5cf6",
+  },
+  counter: {
+    color: "#94a3b8",
+    textAlign: "center",
+    marginTop: 6,
+  },
+  card: {
+    width: 320,
+    height: 220,
+    backgroundColor: "#0f172a",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  word: {
+    fontSize: 22,
+    color: "white",
+    textAlign: "center",
+  },
+  tap: {
+    marginTop: 10,
+    color: "#8b5cf6",
+  },
+  actions: {
+    flexDirection: "row",
+    marginTop: 40,
+    gap: 20,
+  },
+  good: {
+    backgroundColor: "#22c55e",
+    padding: 16,
+    borderRadius: 12,
+  },
+  bad: {
+    backgroundColor: "#ef4444",
+    padding: 16,
+    borderRadius: 12,
+  },
+  btn: {
+    color: "white",
+    fontSize: 18,
+  },
 });
